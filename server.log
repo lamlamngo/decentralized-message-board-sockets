@@ -1,0 +1,39 @@
+2018-02-26 22:59:58,499 - Server - WARNING - =========== Server logging started ==========
+2018-02-26 22:59:58,519 - Server - INFO - Reading peers from peers.txt.
+2018-02-26 22:59:58,678 - Server - INFO - Thread: 5616 - Peer request failed. andersm2-vrtower.union.edu
+2018-02-26 22:59:58,711 - Server - INFO - Wrote peers to peers.txt: []
+2018-02-26 22:59:58,716 - Server - WARNING - ============ Server init complete ===========
+2018-02-26 22:59:58,742 - Server - INFO - Started up on port 50000
+2018-02-26 22:59:58,752 - Server - INFO - Thread: 7792 - Start requesting peers. 1 peers currently
+2018-02-26 22:59:58,771 - Server - WARNING - Thread: 2384 - Started updating from peers
+2018-02-26 22:59:58,782 - Server - INFO - Wrote peers to peers.txt: []
+2018-02-26 22:59:58,787 - Server - WARNING - Thread: 7792 - Complete requesting peers. 1 peers currently
+2018-02-26 22:59:58,792 - Server - WARNING - Thread: 2384 - Completed updating from peers
+2018-02-26 23:00:03,719 - Server - INFO - Wrote peers to peers.txt: [('149.106.60.81', 0)]
+2018-02-26 23:00:03,724 - Server - INFO - Thread: 2384 - Command: PEER_REQUEST - From: 149.106.60.81:34064 - Accepted peer.
+2018-02-26 23:00:03,822 - Server - INFO - Thread: 7792 - Command: UPDATE_REQUEST - From: 149.106.60.81:34068 - Sent 0 blocks to update peer
+2018-02-26 23:00:03,828 - Server - INFO - Thread: 2384 - Command: PEERS_REQUEST - From: 149.106.60.81:34066 - Sent 1 peers to peer
+2018-02-26 23:00:08,008 - Server - WARNING - =========== Server logging started ==========
+2018-02-26 23:00:08,028 - Server - INFO - Reading peers from peers.txt.
+2018-02-26 23:00:08,189 - Server - INFO - Thread: 1808 - Peer request failed. andersm2-vrtower.union.edu
+2018-02-26 23:00:08,355 - Server - INFO - Thread: 1808 - Peer request accepted. 149.106.60.81
+2018-02-26 23:00:08,392 - Server - INFO - Wrote peers to peers.txt: [('149.106.60.81', 0)]
+2018-02-26 23:00:08,397 - Server - WARNING - ============ Server init complete ===========
+2018-02-26 23:00:08,427 - Server - INFO - Started up on port 50000
+2018-02-26 23:00:08,443 - Server - INFO - Thread: 416 - Start requesting peers. 2 peers currently
+2018-02-26 23:00:08,509 - Server - WARNING - Thread: 5008 - Started updating from peers
+2018-02-26 23:00:08,637 - Server - INFO - Wrote peers to peers.txt: [('149.106.60.81', 0)]
+2018-02-26 23:00:08,642 - Server - WARNING - Thread: 416 - Complete requesting peers. 2 peers currently
+2018-02-26 23:00:08,716 - Server - INFO - Thread: 5008 - Received 4 blocks from 149.106.60.81.
+2018-02-26 23:00:08,721 - Server - WARNING - Thread: 5008 - Completed updating from peers
+2018-02-26 23:00:35,259 - Server - WARNING - =========== Server logging started ==========
+2018-02-26 23:00:35,279 - Server - INFO - Reading peers from peers.txt.
+2018-02-26 23:00:35,436 - Server - INFO - Thread: 704 - Peer request failed. andersm2-vrtower.union.edu
+2018-02-26 23:00:35,465 - Server - INFO - Wrote peers to peers.txt: []
+2018-02-26 23:00:35,470 - Server - WARNING - ============ Server init complete ===========
+2018-02-26 23:00:35,501 - Server - INFO - Started up on port 50000
+2018-02-26 23:00:35,511 - Server - INFO - Thread: 9312 - Start requesting peers. 1 peers currently
+2018-02-26 23:00:35,534 - Server - WARNING - Thread: 3904 - Started updating from peers
+2018-02-26 23:00:35,539 - Server - WARNING - Thread: 3904 - Completed updating from peers
+2018-02-26 23:00:35,539 - Server - INFO - Wrote peers to peers.txt: []
+2018-02-26 23:00:35,570 - Server - WARNING - Thread: 9312 - Complete requesting peers. 1 peers currently

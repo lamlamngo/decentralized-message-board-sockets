@@ -7,10 +7,12 @@ import traceback, sys
 from socket import *
 from blockchain_constants import *
 
+from blockchain_objects import *
+
 class Server:
 
 
-    
+
     def __init__(self, blockchain, do_peering, accept_blocks, accept_non_local_msgs):
 
         # Set up logging.
@@ -38,7 +40,10 @@ class Server:
         s.connect(("8.8.8.8", 80))
         self.host = s.getsockname()[0]
         s.close()
-        
+
+        self.got_initial_updates = False
+        self.blocks_while_updating = queue.Queue()
+
         self.lock = threading.Lock()
 
         self.peering_file = "peers.txt"
@@ -48,7 +53,7 @@ class Server:
         self.do_peering = do_peering
         self.accept_blocks = accept_blocks
         self.accept_non_local_msgs = accept_non_local_msgs
-        
+
         self.broadcast_queue = queue.Queue()
         self.blockchain = blockchain
         self.log.warning("============ Server init complete ===========")
@@ -74,9 +79,9 @@ class Server:
 
         self.log.info("Thread: %d - Warning: Punishing peer %s." %
                       (threading.get_ident() % 10000, host))
-        
+
         punished = False
-        
+
         new_peers = []
         #print(self.peers)
         with self.lock:
@@ -90,18 +95,18 @@ class Server:
                     new_peers.append(self.peers[i])
 
             self.peers = new_peers
-            
+
         if punished:
             self.write_peers()
-                       
-    
+
+
     def read_peers(self):
 
         with self.lock:
             self.log.info("Reading peers from %s." % self.peering_file)
             self.peers = [(MAIN_HOST, 0)]
             with open(self.peering_file, 'r') as f:
-                
+
                 for line in f.readlines():
                     line = line.strip()
                     if len(line) <= 0:
@@ -110,7 +115,7 @@ class Server:
                     self.peers.append((gethostbyname(host), 0))
 
         self.confirm_peers()
-                    
+
     def write_peers(self):
 
         with self.lock:
@@ -125,14 +130,12 @@ class Server:
             return True
 
         for peer in self.peers:
-            if gethostbyname(host) == gethostbyname(peer[0]): 
+            if gethostbyname(host) == gethostbyname(peer[0]):
                 return True
 
         return False
-                
-    def run(self):
 
-                    
+    def run(self):
         addr = ('', DEFAULT_PORT)
         buf_len = 4096
 
@@ -146,10 +149,10 @@ class Server:
             self.log.error("Unable to start on port %d" % addr[1])
             exit()
 
-        # Reset peers
+        #Reset peers
         t = threading.Thread(target=self.request_peers)
         t.start()
-            
+
         # Start broadcast thread
         t = threading.Thread(target=self.broadcast)
         t.start()
@@ -157,14 +160,14 @@ class Server:
         # Start update thread
         t = threading.Thread(target=self.get_updates)
         t.start()
-        
+
         # Main server loop
         cleanup = 0
         while True:
             conn, cl_addr = sock.accept()
 
             #print("received connection")
-            
+
             # Handle connection on new thread
             t = threading.Thread(target=self.handle_connection, args=(conn, cl_addr))
             t.start()
@@ -180,32 +183,29 @@ class Server:
             else:
                 cleanup += 1
 
-            
-
-
     def confirm_peers(self):
 
         good_peers = []
         for peer in self.peers:
             if self.confirm_peer(peer[0]):
                 good_peers.append(peer[0])
-        
+
         with self.lock:
             self.peers = []
-            
+
         for peer in good_peers:
             self.add_peer(peer)
-        
+
         self.write_peers()
-                
+
     def confirm_peer(self, host):
 
         good = True
         sock = socket(AF_INET, SOCK_STREAM)
         try:
             sock = create_connection((host, DEFAULT_PORT),TIMEOUT)
-            f_in = sock.makefile('r')                
-            f_out = sock.makefile('w')                
+            f_in = sock.makefile('r')
+            f_out = sock.makefile('w')
             f_out.write("PEER_REQUEST\n")
             f_out.flush()
             time.sleep(WAIT_TIME)
@@ -228,22 +228,22 @@ class Server:
                 pass
 
         return good
-        
-        
+
+
 
     def request_peers(self):
 
         self.log.info("Thread: %d - Start requesting peers. %d peers currently" %
                       (threading.get_ident() % 10000, len(self.peers) + 1))
-        
+
         bad_peers = []
         new_peers = []
         for peer in self.peers:
             sock = socket(AF_INET, SOCK_STREAM)
             try:
                 sock = create_connection((peer[0], DEFAULT_PORT),TIMEOUT)
-                f_in = sock.makefile('r')                
-                f_out = sock.makefile('w')                
+                f_in = sock.makefile('r')
+                f_out = sock.makefile('w')
                 f_out.write("PEERS_REQUEST\n")
                 f_out.flush()
                 time.sleep(WAIT_TIME)
@@ -261,7 +261,7 @@ class Server:
                     sock.close()
                 except:
                     pass
-                    
+
         for peer in bad_peers:
             self.punish_peer(peer[0])
 
@@ -272,53 +272,63 @@ class Server:
                     self.add_peer(new_peer)
 
         self.write_peers()
-        
+
         self.log.warning("Thread: %d - Complete requesting peers. %d peers currently" %
                          (threading.get_ident() % 10000, len(self.peers) + 1))
-                
+
     def get_updates(self):
 
         self.log.warning("Thread: %d - Started updating from peers" %
                          (threading.get_ident() % 10000))
 
-        bad_peers = []
-        for peer in self.peers:
-            sock = socket(AF_INET, SOCK_STREAM)
-            try:
-                sock = create_connection((peer[0], DEFAULT_PORT), TIMEOUT)
-                f_in = sock.makefile('r')                
-                f_out = sock.makefile('w')                
-                f_out.write("UPDATE_REQUEST\n")
-                f_out.flush()
-                f_out.write("%f\n" % 0) #(self.blockchain.latest_time - UPDATE_PAD))
-                f_out.flush()
-                time.sleep(WAIT_TIME)  
-                count = int(f_in.readline().strip())
-                for i in range(count):
-                    self.blockchain.add_block_str(f_in.readline().strip())
-                sock.close()
-                self.log.info("Thread: %d - Received %d blocks from %s." %
-                                 (threading.get_ident() % 10000, count, peer[0]))
-            except:
-                bad_peers.append(peer[0])
-                try:
-                    sock.close()
-                except:
-                    pass
-                    
-        for peer in bad_peers:
-            self.punish_peer(peer)
-
-        self.log.warning("Thread: %d - Completed updating from peers" %
-                         (threading.get_ident() % 10000))
-
-                    
-
-    def broadcast(self):
-
         while True:
             bad_peers = []
-            
+            self.log.info("who are we getting stuff from")
+            self.log.info(self.peers)
+            for peer in self.peers:
+                sock = socket(AF_INET, SOCK_STREAM)
+                try:
+                    sock = create_connection((peer[0], DEFAULT_PORT), TIMEOUT)
+                    f_in = sock.makefile('r')
+                    f_out = sock.makefile('w')
+                    f_out.write("UPDATE_REQUEST\n")
+                    f_out.flush()
+                    f_out.write("%f\n" % float(self.blockchain.latest_time - UPDATE_PAD))
+                    f_out.flush()
+                    time.sleep(WAIT_TIME)
+                    count = int(f_in.readline().strip())
+                    for i in range(count):
+                        self.blockchain.add_block_str(f_in.readline().strip())
+
+                    sock.close()
+                    self.log.info("Thread: %d - Received %d blocks from %s." %
+                                     (threading.get_ident() % 10000, count, peer[0]))
+                except:
+                    bad_peers.append(peer[0])
+                    try:
+                        sock.close()
+                    except:
+                        pass
+
+            while self.blocks_while_updating.qsize() > 0:
+                self.blockchain.add_block_str(self.blocks_while_updating.get_nowait())
+                self.log.info("Thread: %d - Added block we missed while fetching updates" % threading.get_ident())
+
+            self.got_initial_updates = True
+            self.blockchain.loading_ledger = False
+
+            for peer in bad_peers:
+                self.punish_peer(peer)
+
+            self.log.warning("Thread: %d - Completed updating from peers" %
+                             (threading.get_ident() % 10000))
+
+            time.sleep(3600)
+
+    def broadcast(self):
+        while True:
+            bad_peers = []
+
             # Broadcast our own mined blocks first
             item = self.blockchain.get_new_block_str()
             item_type = BLOCK_TYPE
@@ -332,36 +342,36 @@ class Server:
                     continue
 
             self.log.info("Broadcasting %s to peers." % ("message" if item_type == MESSAGE_TYPE else "block"))
-                
+
             for peer in self.peers:
                 sock = socket(AF_INET, SOCK_STREAM)
                 try:
                     sock = create_connection((peer[0], DEFAULT_PORT),TIMEOUT)
-                    f_out = sock.makefile('w')                
+                    f_out = sock.makefile('w')
                     if item_type == MESSAGE_TYPE:
                         f_out.write("MESSAGE_BROADCAST\n")
                     else:
                         f_out.write("BLOCK_BROADCAST\n")
                     f_out.flush()
-                    f_out.write(item + "\n") 
+                    f_out.write(item + "\n")
                     f_out.flush()
                     time.sleep(WAIT_TIME)
                     sock.close()
                 except:
                     self.log.warning("Peer failed to receive broadcasting")
-                    
+
                     bad_peers.append(peer)
                     try:
                         sock.close()
                     except:
                         pass
-                        
+
             for peer in bad_peers:
                 self.punish_peer(peer[0])
 
-            self.log.info("Broadcasting complete.")        
+            self.log.info("Broadcasting complete.")
 
-    
+
     def handle_connection(self, conn, cl_addr):
 
         try:
@@ -370,13 +380,13 @@ class Server:
 
             command = f_in.readline().strip()
             #print("command:", command)
-            
+
             cl_host = cl_addr[0]
             cl_port = int(cl_addr[1])
 
 
-            #self.log.info("Thread: %d - Command: %s - From: %s:%d" %
-            #              (threading.get_ident() % 10000, command, cl_host, cl_port))
+            self.log.info("Thread: %d - Command: %s - From: %s:%d" %
+                          (threading.get_ident() % 10000, command, cl_host, cl_port))
 
             if not self.is_peer(cl_host) and command != "PEER_REQUEST":
                 self.log.warning("Thread: %d - Command: %s - From: %s:%d - Warning: Denied, peer not recognized" %
@@ -412,13 +422,13 @@ class Server:
                     self.broadcast_queue.put((MESSAGE_TYPE, msg_str))
                     f_out.write("ACK\n")
                     f_out.flush()
-                    
+
                 elif self.blockchain.get_message_queue_size() >= MSG_BUFFER_SIZE:
                     self.log.warning("Thread: %d - Command: %s - From: %s:%d - Received duplicate or invalid message, ignoring" %
                                      (threading.get_ident() % 10000, command, cl_host, cl_port))
                     f_out.write("FAILURE - Message buffer full, try again later.\n")
                     f_out.flush()
-                    
+
                 elif self.blockchain.add_message_str(msg_str):
                     # Only broadcast if valid and not seen
                     self.log.info("Thread: %d - Command: %s - From: %s:%d - Received new message to process and broadcast" %
@@ -442,7 +452,12 @@ class Server:
                     self.broadcast_queue.put((BLOCK_TYPE, block_str))
                     f_out.write("ACK\n")
                     f_out.flush()
-                elif self.blockchain.add_block_str(block_str):  
+                #else:
+
+                elif not self.got_initial_updates:
+                    self.blocks_while_updating.put_nowait(block_str)
+                    self.log.info("Thread: %d - Currently getting updates, block added to the post-updates queue" % threading.get_ident())
+                elif self.blockchain.add_block_str(block_str):
                     # Only broadcast if valid and not seen
                     self.log.info("Thread: %d - Command: %s - From: %s:%d - Received new block to process and broadcast" %
                                   (threading.get_ident() % 10000, command, cl_host, cl_port))
@@ -467,7 +482,7 @@ class Server:
                     self.log.info("Thread: %d - Command: %s - From: %s:%d - Sent %d blocks to update peer" %
                                      (threading.get_ident() % 10000, command, cl_host, cl_port, len(block_strs)))
                 except:
-                    self.log.warning("Thread: %d - Command: %s - From: %s:%d - Warning: Recieved invalid UPDATE_REQUEST" %
+                    self.log.warning("Thread: %d - Command: %s - From: %s:%d - Warning: Received invalid UPDATE_REQUEST" %
                                   (threading.get_ident() % 10000, command, cl_host, cl_port))
                     f_out.write("ERROR Time not recognized")
                     f_out.flush()
@@ -479,7 +494,7 @@ class Server:
                     f_out.write(str(0) + "\n")
                     f_out.flush()
                 else:
-                
+
                     with self.lock:
                         f_out.write(str(len(self.peers)) + "\n")
                         f_out.flush()
@@ -499,9 +514,3 @@ class Server:
                            (threading.get_ident() % 10000, command, cl_host, cl_port, traceback.format_exc()))
 
         conn.close()
-                                        
-
-
-
-
-

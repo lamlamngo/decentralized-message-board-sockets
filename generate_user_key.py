@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.backends import default_backend
@@ -62,4 +64,3 @@ for i in range(0,num_keys-1):
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         )
         key_file.write(pem.decode())
-    
